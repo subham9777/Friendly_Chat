@@ -83,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
     private ChildEventListener mChildEventListener;
     private FirebaseAuth mFirebaseAuth;
     private FirebaseAuth.AuthStateListener mAuthStateListener;
-    private StorageReference mChatPhotosStorage;
+    private StorageReference mChatPhotosStorageReference;
     private FirebaseRemoteConfig mfirebaseRemoteConfig;
     private InterstitialAd mInterstitialAdd;
 
@@ -91,6 +91,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        FirebaseDatabase.getInstance().setPersistenceEnabled(true);
 
         mUsername = ANONYMOUS;
         MobileAds.initialize(getApplicationContext(), "ca-app-pub-9036874153188100~4111262076");
@@ -108,7 +109,10 @@ public class MainActivity extends AppCompatActivity {
         FirebaseStorage mFirebaseStorage = FirebaseStorage.getInstance();
         mfirebaseRemoteConfig = FirebaseRemoteConfig.getInstance();
         mMessageDatabaseReference = mFirebaseDatabase.getReference().child("messages");
-        mChatPhotosStorage = mFirebaseStorage.getReference().child("chat_photos");
+        mChatPhotosStorageReference = mFirebaseStorage.getReference().child("chat_photos");
+
+        DatabaseReference mDatabaseReference = FirebaseDatabase.getInstance().getReference("messages");
+        mDatabaseReference.keepSynced(true);
 
         // Initialize references to views
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
@@ -121,7 +125,6 @@ public class MainActivity extends AppCompatActivity {
         final List<FriendlyMessage> friendlyMessages = new ArrayList<>();
         mMessageAdapter = new MessageAdapter(this, R.layout.item_message, friendlyMessages);
         mMessageListView.setAdapter(mMessageAdapter);
-
         // Initialize progress bar
         mProgressBar.setVisibility(ProgressBar.INVISIBLE);
 
@@ -176,13 +179,14 @@ public class MainActivity extends AppCompatActivity {
 
         mAuthStateListener = new FirebaseAuth.AuthStateListener() {
             @Override
-            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+            public void onAuthStateChanged( FirebaseAuth firebaseAuth) {
                 FirebaseUser user = firebaseAuth.getCurrentUser();
                 if (user != null) {
                     //signed in
                     onSignedInInitialize(user.getDisplayName());
                     Toast.makeText(MainActivity.this, "Welcome to chat app. You are signed in.", Toast.LENGTH_SHORT).show();
-                } else {
+                }
+            else {
                     //signed out
                     onSignedOutCleanup();
                     startActivityForResult(
@@ -219,11 +223,11 @@ public class MainActivity extends AppCompatActivity {
         } else {
             if (requestCode == RC_PHOTO_PICKER && resultCode == RESULT_OK) {
                 Uri selectedImageUri = data.getData();
-                StorageReference photoRef = mChatPhotosStorage.child(selectedImageUri.getLastPathSegment());
-                photoRef.putFile(selectedImageUri)
-                        .addOnSuccessListener(this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                StorageReference photoRef = mChatPhotosStorageReference.child(selectedImageUri.getLastPathSegment());
+                photoRef.putFile(selectedImageUri).addOnSuccessListener
+                        (this, new OnSuccessListener<UploadTask.TaskSnapshot>() {
                             public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                                Uri downloadUrl = taskSnapshot.getDownloadUrl();
+                                @SuppressWarnings("VisibleForTests") Uri downloadUrl = taskSnapshot.getDownloadUrl();
                                 FriendlyMessage friendlyMessage = new FriendlyMessage(null, mUsername,downloadUrl.toString());
                                 mMessageDatabaseReference.push().setValue(friendlyMessage);
                             }
@@ -293,7 +297,8 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-
+                    FriendlyMessage friendlyMessage = dataSnapshot.getValue(FriendlyMessage.class);
+                    mMessageAdapter.add(friendlyMessage);
                 }
 
                 @Override
